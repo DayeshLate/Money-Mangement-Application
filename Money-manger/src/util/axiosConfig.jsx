@@ -12,19 +12,28 @@ const axiosConfig = axios.create({
 
 const excludeEndpoint = [
   "/profile/login",
-  "/profile/signup",
   "/profile/register",
   "/status",
   "/profile/activate",
   "/health",
 ];
 
+const getRequestPath = (url) => {
+  if (!url) {
+    return "";
+  }
+
+  try {
+    return new URL(url, BASE_URL || window.location.origin).pathname;
+  } catch {
+    return url;
+  }
+};
+
 axiosConfig.interceptors.request.use(
   (config) => {
-
-    const shouldSkipToken = excludeEndpoint.some((endpoint) => {
-      return config.url?.includes(endpoint);
-    });
+    const requestPath = getRequestPath(config.url);
+    const shouldSkipToken = excludeEndpoint.some((endpoint) => requestPath.endsWith(endpoint));
 
     if (!shouldSkipToken) {
       const accessToken = localStorage.getItem("token");
