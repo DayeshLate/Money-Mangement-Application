@@ -1,8 +1,15 @@
 package com.danny.MoneyManagerApplication.service;
 
+import java.time.LocalDate;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.danny.MoneyManagerApplication.DTO.ExpenseDTO;
+import com.danny.MoneyManagerApplication.client.NotificationServiceClient;
+import com.danny.MoneyManagerApplication.entity.ProfileEntity;
 import com.danny.MoneyManagerApplication.repository.ProfileRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -14,56 +21,50 @@ import lombok.extern.slf4j.Slf4j;
 public class NotificationService {
     
     private final ProfileRepository profileRepository;
-    private final EmailService emailService;
     private final ExpenseService expenseService;
+    private final NotificationServiceClient notificationServiceClient;
 
-    @Value("${money.manger.fronted.url}")
+    @Value("${money.manger.fronted.url:https://money-mangement-application.vercel.app}")
     private String frontUrl;
 
-    // @Scheduled(cron = "0 0 22 * * *",zone = "IST")
-    // public void sendDailyIncomeExpenseReminder(){
-    //     log.info("Job started : senddailyIncomeExpenseReminder()");
-    //     List<ProfileEntity> profiles = profileRepository.findAll();
-    //     for(ProfileEntity profile : profiles){
-    //         String body = "Hi" + profile.getFullName() + ",<br><br>"
-    //                         +"This is a frendaly reminder to addd your income and expense for today in Money manger"
-    //                         +"<a href="+frontUrl+"style='display:inline-block:padding:10px 20px: background-color:#4CAF50;color:#fff;text-decoration:none;"
-    //                         +"<br><br> Best regards,<br>Money Manager Team";
+    @Scheduled(cron = "0 0 22 * * *", zone = "Asia/Kolkata")
+    public void sendDailyIncomeExpenseReminder() {
+        log.info("Job started : sendDailyIncomeExpenseReminder() via Node.js microservice");
+        List<ProfileEntity> profiles = profileRepository.findAll();
+        for (ProfileEntity profile : profiles) {
+            if (profile.getEmail() != null) {
+                notificationServiceClient.sendReminderEmail(
+                    profile.getEmail(),
+                    profile.getFullName(),
+                    frontUrl
+                );
+            }
+        }
+        log.info("Job completed : sendDailyIncomeExpenseReminder()");
+    }
 
-    //             emailService.sendEmail(profile.getEmail(), "Daily Reminder ; add you income and expense",body);
-    //     }
-    // }
+    @Scheduled(cron = "0 0 23 * * *", zone = "Asia/Kolkata")
+    public void sendDailyExpenseSummary() {
+        log.info("Job started : sendDailyExpenseSummary() via Node.js microservice");
+        List<ProfileEntity> profiles = profileRepository.findAll();
+        for (ProfileEntity profile : profiles) {
+            if (profile.getEmail() != null) {
+                List<ExpenseDTO> todaysExpenses = expenseService.getExpensesForUserOnDate(profile.getId(), LocalDate.now());
+                if (!todaysExpenses.isEmpty()) {
+                    double total = todaysExpenses.stream()
+                            .mapToDouble(e -> e.getAmount() != null ? e.getAmount().doubleValue() : 0.0)
+                            .sum();
 
-    
-    //@Scheduled(cron = "0 * * * * *",zone = "Asia/Kolkata")
-    //  @Scheduled(cron = "0 0 23 * * *",zone = "Asia/Kolkata")
-    // public void sendDailyExpenseSummary(){
-    //     log.info("Job started : sendDailyExpenseSummery()");
-    //     List<ProfileEntity> profiles = profileRepository.findAll();
-    //     for(ProfileEntity profile : profiles){
-    //         List<ExpenseDTO> todaysExpenses = expenseService.getExpensesForUserOnDate(profile.getId(), LocalDate.now());
-    //         if(!todaysExpenses.isEmpty()){
-    //             StringBuilder table = new StringBuilder();
-    //             table.append("<table style='border-collapse:collapse;width:100%;'>");
-    //             table.append("<tr style='background-color:#f2f2f2;'>"
-    //                             + "<th style='border:1px solid #ddd;padding:8px;'>S.No</th>"
-    //                             + "<th style='border:1px solid #ddd;padding:8px;'>Name</th>"
-    //                             + "<th style='border:1px solid #ddd;padding:8px;'>Amount</th>"
-    //                             + "</tr>");
-    //             int i = 1; 
-    //             for (ExpenseDTO expenseDTO : todaysExpenses) {
-    //                 table.append("<tr>");
-    //                 table.append("<td style='border:1px solid #ddd;padding:8px;'>").append(i++).append("</td>");
-    //                 table.append("<td style='border:1px solid #ddd;padding:8px;'>").append(expenseDTO.getName()).append("</td>");
-    //                 table.append("<td style='border:1px solid #ddd;padding:8px;'>₹ ").append(expenseDTO.getAmount()).append("</td>");
-    //                 table.append("</tr>");
-    //             }
-    //             table.append("</table>");
-    //             String body = "Hi"+profile.getFullName()+",<br/><br/> Here is a summary of your expense for the today:<br/><br/>"+table+"<br/><br/> Best regards, <br/> Money manager Team";
-    //             emailService.sendEmail(profile.getEmail(), "Your daily expense summery", body); 
-    //         }
-    //     }
-    //     log.info("Job completed : senddailyExpenseReminder()");
-    
-    // }
+                    notificationServiceClient.sendDailyExpenseSummary(
+                        profile.getEmail(),
+                        profile.getFullName(),
+                        LocalDate.now().toString(),
+                        todaysExpenses,
+                        total
+                    );
+                }
+            }
+        }
+        log.info("Job completed : sendDailyExpenseSummary()");
+    }
 }

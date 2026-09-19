@@ -28,6 +28,7 @@ public class ProfileService {
 
     private final ProfileRepository profileRepository;
     private final EmailService emailService;
+    private final com.danny.MoneyManagerApplication.client.NotificationServiceClient notificationServiceClient;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
@@ -45,10 +46,20 @@ public class ProfileService {
         String subject = "Activate your Money Manager account";
         String body = "Click on the following link to activate your account: " + activationLink;
 
-        try {
-            emailService.sendEmail(newProfile.getEmail(), subject, body);
-        } catch (Exception exception) {
-            log.error("Activation email could not be sent to {}", newProfile.getEmail(), exception);
+        // Dispatch via Node.js microservice with fallback
+        boolean sentViaMicroservice = notificationServiceClient.sendActivationEmail(
+                newProfile.getEmail(),
+                newProfile.getFullName(),
+                activationLink
+        );
+
+        if (!sentViaMicroservice) {
+            log.warn("Node.js microservice dispatch failed or unreachable. Falling back to local EmailService for {}", newProfile.getEmail());
+            try {
+                emailService.sendEmail(newProfile.getEmail(), subject, body);
+            } catch (Exception exception) {
+                log.error("Activation email could not be sent to {}", newProfile.getEmail(), exception);
+            }
         }
         return toDto(newProfile);
     }

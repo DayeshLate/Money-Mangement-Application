@@ -16,4 +16,7 @@ export const API_ENDPOINT ={
     GET_ALL_EXPENSE: "/expense",
     CREATE_EXPENSE: "/expense/add",
     DELETE_EXPENSE: "/expense/",
+
+    FILTER: "/filter",
+    EXPORT_REPORT: "/report/export",
 }
